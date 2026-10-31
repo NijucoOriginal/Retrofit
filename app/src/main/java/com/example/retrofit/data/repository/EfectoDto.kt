@@ -1,5 +1,8 @@
 package com.example.retrofit.data.repository
 
-data class EfectoDto(var short_effect: String = "",
-                     var language: Referencia) {
-}
+import com.google.gson.annotations.SerializedName
+
+data class EfectoDto(
+    @SerializedName("short_effect") val shortEffect: String = "",
+    val language: Referencia? = null
+)
