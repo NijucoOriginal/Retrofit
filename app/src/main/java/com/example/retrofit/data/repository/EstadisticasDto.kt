@@ -1,5 +1,7 @@
 package com.example.retrofit.data.repository
 
-data class EstadisticasDto(val id: Int = 0,
-                           var name: String = "") {
+import com.google.gson.annotations.SerializedName
+
+data class EstadisticasDto(@SerializedName("base_stat") val baseStat: Int = 0,
+                           val stat: Referencia? = null) {
 }
