@@ -1,7 +1,7 @@
 package com.example.retrofit.data.remote
 
-import com.example.retrofit.data.repository.PokemonDto
-import com.example.retrofit.data.repository.Referencia
+import com.example.retrofit.domain.model.Habilidad
+import com.example.retrofit.domain.model.Pokemon
 import com.example.retrofit.domain.repository.PokemonRepository
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -11,11 +11,22 @@ class PokemonRepositoryImpl @Inject constructor(
     private val apiservice: ApiService
 ): PokemonRepository {
 
-    override suspend fun solicitarPokemon(name: String): PokemonDto {
-        return apiservice.solicitarPokemon(name)
+    override suspend fun solicitarPokemon(name: String): Pokemon {
+        val pokemonDto =apiservice.solicitarPokemon(name)
+        val especieDto =apiservice.solicitarGeneracionPokemon(pokemonDto.species!!.name)
+
+        val habilidades: MutableList<Habilidad> = mutableListOf()
+
+        pokemonDto.abilities.forEach { habilidadPokemon ->
+            val busquedaPokemon = apiservice.solicitarInformacionHabilidad(habilidadPokemon.ability!!.name)
+            habilidades.add(habilidadPokemon.toDomain(busquedaPokemon))
+        }
+
+        return pokemonDto.toDomain(especieDto.generation,habilidades)
+
+
+
+
     }
 
-    override suspend fun solicitarGeneracionPokemon(name: String): Referencia {
-        return apiservice.solicitarGeneracionPokemon(name)
-    }
 }

@@ -14,19 +14,16 @@ data class PokemonDto(val id: Int = 0,
                       var species: Referencia? = null
     ) {
 
-    fun toDomain(generacion: Referencia,habilidadDto: HabilidadDto): Pokemon = Pokemon (
+    fun toDomain(generacion: Referencia?, habilidades: MutableList<Habilidad>): Pokemon = Pokemon (
         id = id,
         nombre = name,
         tipo = convertirTipo(types.first()),
         tipo2 = convertirTipo(types.get(1)),
-        habilidad = retornarHabilidadCorrecta(abilities,1,false,habilidadDto),
-        habilidad2 = retornarHabilidadCorrecta(abilities,2,false,habilidadDto),
-        oculta = retornarHabilidadCorrecta(abilities,1,true,habilidadDto),
+        habilidad = retornarSlotCorrecto(habilidades,1),
+        habilidad2 = retornarSlotCorrecto(habilidades,2),
+        oculta = retornarOculta(habilidades),
         estadisticas = convertirEstadistica(stats),
         generacion = determinarGeneracion(generacion)
-
-
-
     )
     fun convertirTipo(type : TipoDto): Tipo? {
         val tipo : Tipo? = when(type.type) {
@@ -55,27 +52,29 @@ data class PokemonDto(val id: Int = 0,
         return tipo
     }
 
-    fun retornarHabilidadCorrecta(abilities: List<HabilidadPokemonDto>, slot: Int, oculta: Boolean,habilidadDto: HabilidadDto): Habilidad? {
-       if(oculta)
-       {
-           abilities.forEach { habilidad ->
-               if(habilidad.isHidden)
-               {
-                   return habilidad.toDomain(habilidadDto)
-               }
-           }
-           return null
-       }
-       else
-       {
-           abilities.forEach { habilidad ->
-               if(habilidad.slot==slot)
-               {
-                   return habilidad.toDomain(habilidadDto)
-               }
-           }
-           return null
-       }
+    fun retornarOculta(habilidades: MutableList<Habilidad>): Habilidad? {
+        habilidades.forEach { habilidad ->
+            if(habilidad.esOculta)
+            {
+                return habilidad
+            }
+        }
+        return null
+    }
+
+    fun retornarSlotCorrecto(habilidades: MutableList<Habilidad>,slot: Int): Habilidad? {
+        abilities.forEach { ability ->
+            habilidades.forEach { habilidad ->
+                if(ability.ability!!.name==habilidad.nombre)
+                {
+                    if(ability.slot==slot)
+                    {
+                        return habilidad
+                    }
+                }
+            }
+        }
+        return null
     }
 
     fun convertirEstadistica(stats: List<EstadisticasDto>): Estadisticas {
