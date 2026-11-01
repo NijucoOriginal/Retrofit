@@ -13,10 +13,10 @@ data class PokemonDto(
     val types: List<TipoDto> = listOf(),
     val abilities: List<HabilidadPokemonDto> = listOf(),
     val stats: List<EstadisticasDto> = listOf(),
-    val species: Referencia? = null
+    val species: Referencia? = null,
+    val sprites: SpritesDto? = null
 ) {
 
-    // Recibe las habilidades ya convertidas por el repositorio
     fun toDomain(generacion: Referencia?, habilidades: List<Habilidad>): Pokemon {
         val normales = habilidades.filter { !it.esOculta }
 
@@ -29,7 +29,8 @@ data class PokemonDto(
             habilidad2 = normales.getOrNull(1),
             oculta = habilidades.firstOrNull { it.esOculta },
             estadisticas = convertirEstadisticas(stats),
-            generacion = traducirGeneracion(generacion)
+            generacion = traducirGeneracion(generacion),
+            imagenUrl = sprites?.frontDefault
         )
     }
 

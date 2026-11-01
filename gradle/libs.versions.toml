@@ -14,6 +14,7 @@ ksp = "2.3.6" # Desde KSP 2.3.0 la versión ya no va atada a la versión de Kotl
 retrofit = "3.0.0"
 navigationCompose = "2.10.2"
 kotlinxSerialization = "1.11.0"
+coil = "2.7.0"
 
 
 [libraries]
@@ -39,6 +40,8 @@ converter-gson = { module = "com.squareup.retrofit2:converter-gson", version.ref
 androidx-navigation-compose = { module = "androidx.navigation:navigation-compose", version.ref = "navigationCompose" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
 androidx-compose-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }
+coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }
+
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

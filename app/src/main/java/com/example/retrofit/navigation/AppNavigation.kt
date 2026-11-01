@@ -30,17 +30,17 @@ fun AppNavigation() {
             composable<MainRoutes.Lista> {
                 val viewModel: ListaViewModel = hiltViewModel()
                 val hayConexion by viewModel.hayConexion.collectAsState()
+                val estado by viewModel.uiState.collectAsState()
 
                 ListaScreen(
-                    pokemones = viewModel.pokemones,
+                    estado = estado,
                     textoBusqueda = viewModel.texto,
                     onTextoBusquedaChange = viewModel::cambiarTexto,
                     tipoSeleccionado = viewModel.tipo,
                     onTipoSeleccionado = viewModel::cambiarTipo,
                     hayConexion = hayConexion,
-                    cargando = viewModel.cargando,
-                    error = viewModel.error,
                     onFinalDeLista = viewModel::cargarSiguientePagina,
+                    onReintentar = viewModel::reintentar,
                     onPokemonClick = { nombre ->
                         navController.navigate(MainRoutes.Detalle(nombre))
                     }

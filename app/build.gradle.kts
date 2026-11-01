@@ -50,6 +50,7 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.androidx.compose.material.icons.extended)
+    implementation(libs.coil.compose)
 
     // --- Hilt Core ---
     implementation(libs.hilt.android)

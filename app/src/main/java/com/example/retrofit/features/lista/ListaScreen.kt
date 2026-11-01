@@ -2,13 +2,19 @@ package com.example.retrofit.features.lista
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -26,23 +32,24 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
 import com.example.retrofit.domain.model.PokemonResumen
 import com.example.retrofit.domain.model.Tipo
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ListaScreen(
-    pokemones: List<PokemonResumen>,
+    estado: ListaUiState,
     textoBusqueda: String,
     onTextoBusquedaChange: (String) -> Unit,
     tipoSeleccionado: Tipo?,
     onTipoSeleccionado: (Tipo?) -> Unit,
     hayConexion: Boolean,
-    cargando: Boolean,
-    error: String?,
     onFinalDeLista: () -> Unit,
+    onReintentar: () -> Unit,
     onPokemonClick: (String) -> Unit
 ) {
     val listState = rememberLazyListState()
@@ -55,9 +62,9 @@ fun ListaScreen(
         }
     }
 
-    // Cuando cambia a true y no estamos cargando, pedimos más datos
+    // Solo se pide más si ya hay una lista que ampliar
     LaunchedEffect(cercaDelFinal) {
-        if (cercaDelFinal && !cargando) onFinalDeLista()
+        if (cercaDelFinal && estado is ListaUiState.Exito) onFinalDeLista()
     }
 
     // Al cambiar la búsqueda o el filtro, la lista vuelve arriba
@@ -89,27 +96,67 @@ fun ListaScreen(
 
             item { FiltroTipos(tipoSeleccionado, onTipoSeleccionado) }
 
-            error?.let { mensaje ->
-                item { Text(mensaje, color = Color(0xFFC62828)) }
-            }
+            when (estado) {
+                ListaUiState.Cargando -> item { CargaCentrada() }
 
-            items(pokemones, key = { it.id }) { pokemon ->
-                TarjetaPokemon(
-                    pokemon = pokemon,
-                    onClick = { onPokemonClick(pokemon.nombre) }
-                )
-            }
+                is ListaUiState.Error -> item {
+                    MensajeConReintento(estado.mensaje, onReintentar)
+                }
 
-            if (cargando) {
-                item {
-                    Box(
-                        modifier = Modifier.fillMaxWidth(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator(Modifier.padding(16.dp))
+                is ListaUiState.Exito -> {
+                    if (estado.pokemones.isEmpty()) {
+                        item {
+                            Text(
+                                "No hay Pokémon que coincidan con la búsqueda.",
+                                modifier = Modifier.padding(vertical = 16.dp)
+                            )
+                        }
+                    }
+
+                    items(estado.pokemones, key = { it.id }) { pokemon ->
+                        TarjetaPokemon(
+                            pokemon = pokemon,
+                            onClick = { onPokemonClick(pokemon.nombre) }
+                        )
+                    }
+
+                    if (estado.cargandoMas) {
+                        item { CargaCentrada() }
+                    }
+
+                    estado.errorMas?.let { mensaje ->
+                        item { MensajeConReintento(mensaje, onReintentar) }
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun CargaCentrada() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        CircularProgressIndicator()
+    }
+}
+
+@Composable
+fun MensajeConReintento(mensaje: String, onReintentar: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(mensaje, color = Color(0xFFC62828))
+        Button(onClick = onReintentar) {
+            Text("Reintentar")
         }
     }
 }
@@ -144,10 +191,21 @@ fun FiltroTipos(seleccionado: Tipo?, onSeleccionar: (Tipo?) -> Unit) {
 @Composable
 fun TarjetaPokemon(pokemon: PokemonResumen, onClick: () -> Unit) {
     Card(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = "#${pokemon.id}  ${pokemon.nombre.replaceFirstChar { it.uppercase() }}",
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(16.dp)
-        )
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            AsyncImage(
+                model = pokemon.imagenUrl,
+                contentDescription = pokemon.nombre,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.size(64.dp)
+            )
+            Spacer(Modifier.width(12.dp))
+            Text(
+                text = "#${pokemon.id}  ${pokemon.nombre.replaceFirstChar { it.uppercase() }}",
+                fontWeight = FontWeight.Bold
+            )
+        }
     }
 }

@@ -13,7 +13,9 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -23,18 +25,12 @@ class ListaViewModel @Inject constructor(
     private val monitorConexion: MonitorConexion
 ) : ViewModel() {
 
-    // Se declara antes del bloque init para que ya esté inicializada
     val hayConexion: StateFlow<Boolean> = monitorConexion.hayConexion
 
-    var pokemones by mutableStateOf<List<PokemonResumen>>(emptyList())
-        private set
+    private val _uiState = MutableStateFlow<ListaUiState>(ListaUiState.Cargando)
+    val uiState: StateFlow<ListaUiState> = _uiState.asStateFlow()
 
-    var cargando by mutableStateOf(false)
-        private set
-
-    var error by mutableStateOf<String?>(null)
-        private set
-
+    // Lo que escribe el usuario: no es un resultado, así que no va en uiState
     var texto by mutableStateOf("")
         private set
 
@@ -51,12 +47,10 @@ class ListaViewModel @Inject constructor(
     init {
         cargarSiguientePagina()
 
-        // Si vuelve la conexión y la última carga falló, reintentamos sola
+        // Si vuelve la conexión y la lista había fallado, reintentamos sola
         viewModelScope.launch {
             hayConexion.collect { conectado ->
-                if (conectado && error != null && !hayFiltros()) {
-                    cargarSiguientePagina()
-                }
+                if (conectado && necesitaReintento() && !hayFiltros()) reintentar()
             }
         }
     }
@@ -71,50 +65,73 @@ class ListaViewModel @Inject constructor(
         aplicarFiltros(conRetraso = false)
     }
 
-    // Lista general paginada. Solo se usa cuando no hay filtros activos
+    // Botón "Reintentar": repite lo que falló según el estado actual
+    fun reintentar() {
+        when {
+            hayFiltros() -> aplicarFiltros(conRetraso = false)
+            _uiState.value is ListaUiState.Exito -> cargarSiguientePagina()
+            else -> reiniciar()
+        }
+    }
+
+    // Scroll infinito: pide la siguiente página de la lista general
     fun cargarSiguientePagina() {
-        if (cargando || !hayMas || hayFiltros()) return
+        if (!hayMas || hayFiltros() || trabajo?.isActive == true) return
+
+        val actual = _uiState.value
+        val anteriores = (actual as? ListaUiState.Exito)?.pokemones.orEmpty()
+
+        _uiState.value = if (actual is ListaUiState.Exito) {
+            actual.copy(cargandoMas = true, errorMas = null)
+        } else {
+            ListaUiState.Cargando
+        }
 
         trabajo = viewModelScope.launch {
-            cargando = true
-            error = null
             try {
                 val nuevos = repository.obtenerListaPokemon(LIMITE, offset)
-                pokemones = pokemones + nuevos
                 offset += LIMITE
                 hayMas = nuevos.size == LIMITE
+                _uiState.value = ListaUiState.Exito(pokemones = anteriores + nuevos)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                error = "No se pudo cargar la lista. Revisa tu conexión."
-            } finally {
-                cargando = false
+                _uiState.value = if (anteriores.isEmpty()) {
+                    ListaUiState.Error("No se pudo cargar la lista. Revisa tu conexión.")
+                } else {
+                    // Conservamos lo que ya se ve y solo avisamos del fallo
+                    ListaUiState.Exito(
+                        pokemones = anteriores,
+                        errorMas = "No se pudieron cargar más Pokémon."
+                    )
+                }
             }
         }
+    }
+
+    // Vuelve a la lista general desde la primera página
+    private fun reiniciar() {
+        trabajo?.cancel()
+        offset = 0
+        hayMas = true
+        _uiState.value = ListaUiState.Cargando
+        cargarSiguientePagina()
     }
 
     private fun aplicarFiltros(conRetraso: Boolean) {
         // Solo cuenta el filtro más reciente
         trabajo?.cancel()
-        cargando = false
-        error = null
 
         val textoLimpio = texto.trim().lowercase()
         val tipoActual = tipo
 
         when {
-            // Sin filtros: volvemos a la lista general desde el principio
-            textoLimpio.isEmpty() && tipoActual == null -> {
-                pokemones = emptyList()
-                offset = 0
-                hayMas = true
-                cargarSiguientePagina()
-            }
+            textoLimpio.isEmpty() && tipoActual == null -> reiniciar()
 
             // Con tipo: pedimos sus Pokémon y filtramos por texto en local
             tipoActual != null -> {
+                _uiState.value = ListaUiState.Cargando
                 trabajo = viewModelScope.launch {
-                    cargando = true
                     try {
                         val lista = cacheTipo
                             ?.takeIf { it.first == tipoActual }
@@ -122,36 +139,45 @@ class ListaViewModel @Inject constructor(
                             ?: repository.obtenerPokemonesPorTipo(tipoActual)
                                 .also { cacheTipo = tipoActual to it }
 
-                        pokemones = lista.filter { it.nombre.contains(textoLimpio) }
+                        // Una lista vacía aquí significa "sin resultados", no un error
+                        _uiState.value = ListaUiState.Exito(
+                            pokemones = lista.filter { it.nombre.contains(textoLimpio) }
+                        )
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Exception) {
-                        pokemones = emptyList()
-                        error = "No se pudieron cargar los Pokémon de ese tipo."
-                    } finally {
-                        cargando = false
+                        _uiState.value = ListaUiState.Error(
+                            "No se pudieron cargar los Pokémon de ese tipo."
+                        )
                     }
                 }
             }
 
             // Solo texto: búsqueda exacta por nombre, con retraso para no pedir en cada letra
             else -> {
+                _uiState.value = ListaUiState.Cargando
                 trabajo = viewModelScope.launch {
                     if (conRetraso) delay(400)
-                    cargando = true
                     try {
-                        pokemones = listOf(repository.buscarResumen(textoLimpio))
+                        _uiState.value = ListaUiState.Exito(
+                            pokemones = listOf(repository.buscarResumen(textoLimpio))
+                        )
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Exception) {
-                        pokemones = emptyList()
-                        error = "No se encontró ningún Pokémon llamado \"$textoLimpio\"."
-                    } finally {
-                        cargando = false
+                        _uiState.value = ListaUiState.Error(
+                            "No se encontró ningún Pokémon llamado \"$textoLimpio\"."
+                        )
                     }
                 }
             }
         }
+    }
+
+    private fun necesitaReintento(): Boolean = when (val estado = _uiState.value) {
+        is ListaUiState.Error -> true
+        is ListaUiState.Exito -> estado.errorMas != null
+        ListaUiState.Cargando -> false
     }
 
     private fun hayFiltros(): Boolean = texto.isNotBlank() || tipo != null

@@ -30,6 +30,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.retrofit.domain.model.Habilidad
 import com.example.retrofit.domain.model.Pokemon
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.layout.ContentScale
+import coil.compose.AsyncImage
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -85,12 +88,24 @@ fun DetalleScreen(
                     .padding(padding)
                     .padding(16.dp)
                     .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Text(
                     text = "#${pokemon.id}  ${pokemon.nombre.replaceFirstChar { it.uppercase() }}",
                     style = MaterialTheme.typography.headlineMedium
                 )
+
+                pokemon.imagenUrl?.let { url ->
+                    AsyncImage(
+                        model = url,
+                        contentDescription = pokemon.nombre,
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier
+                            .size(200.dp)
+                            .align(Alignment.CenterHorizontally)
+                    )
+                }
+
                 Text("Tipo: ${pokemon.tipo}${pokemon.tipo2?.let { " / $it" } ?: ""}")
                 Text("Generación: ${pokemon.generacion}")
 

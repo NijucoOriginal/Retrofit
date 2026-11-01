@@ -9,6 +9,6 @@ data class Pokemon(
     var habilidad2: Habilidad?,
     var oculta: Habilidad?,
     var estadisticas: Estadisticas,
-    val generacion: Generacion
-) {
-}
+    val generacion: Generacion,
+    val imagenUrl: String? = null
+)

@@ -1,5 +1,6 @@
 package com.example.retrofit.data.remote
 
+import com.example.retrofit.data.repository.traducirGeneracion
 import com.example.retrofit.domain.model.Pokemon
 import com.example.retrofit.domain.model.PokemonResumen
 import com.example.retrofit.domain.model.Tipo
@@ -13,13 +14,9 @@ class PokemonRepositoryImpl @Inject constructor(
 ) : PokemonRepository {
 
     override suspend fun obtenerPokemon(name: String): Pokemon {
-        // 1. Datos del Pokémon: tipos, estadísticas y lista de habilidades
         val pokemonDto = apiService.solicitarPokemon(name)
-
-        // 2. Especie: de aquí sale la generación
         val especie = apiService.solicitarEspecie(pokemonDto.species!!.name)
 
-        // 3. Una petición por habilidad para obtener su efecto y generación
         val habilidades = pokemonDto.abilities
             .sortedBy { it.slot }
             .map { habilidadPokemon ->
@@ -35,16 +32,22 @@ class PokemonRepositoryImpl @Inject constructor(
 
     override suspend fun obtenerListaPokemon(limit: Int, offset: Int): List<PokemonResumen> {
         return apiService.solicitarListaPokemon(limit, offset).results.map { ref ->
+            val id = idDesdeUrl(ref.url)
             PokemonResumen(
-                id = idDesdeUrl(ref.url),
-                nombre = ref.name
+                id = id,
+                nombre = ref.name,
+                imagenUrl = urlSprite(id)
             )
         }
     }
 
     override suspend fun buscarResumen(nombre: String): PokemonResumen {
         val dto = apiService.solicitarPokemon(nombre)
-        return PokemonResumen(id = dto.id, nombre = dto.name)
+        return PokemonResumen(
+            id = dto.id,
+            nombre = dto.name,
+            imagenUrl = urlSprite(dto.id)
+        )
     }
 
     override suspend fun obtenerPokemonesPorTipo(tipo: Tipo): List<PokemonResumen> {
@@ -52,16 +55,23 @@ class PokemonRepositoryImpl @Inject constructor(
             .pokemon
             .mapNotNull { elemento ->
                 elemento.pokemon?.let { ref ->
-                    PokemonResumen(id = idDesdeUrl(ref.url), nombre = ref.name)
+                    val id = idDesdeUrl(ref.url)
+                    PokemonResumen(
+                        id = id,
+                        nombre = ref.name,
+                        imagenUrl = urlSprite(id)
+                    )
                 }
             }
     }
 
-    // El id no viene como campo: está al final de la URL
     private fun idDesdeUrl(url: String): Int =
         url.trimEnd('/').substringAfterLast('/').toInt()
 
-    // Nombre con el que la API identifica cada tipo
+    // Mismo patrón que sprites.front_default, pero calculado a partir del id
+    private fun urlSprite(id: Int): String =
+        "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/$id.png"
+
     private fun Tipo.nombreApi(): String = when (this) {
         Tipo.ACERO -> "steel"
         Tipo.AGUA -> "water"
